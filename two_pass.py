@@ -14,18 +14,18 @@ from skimage.io import imsave
 from utils import *
 
 # File Inputs
-idx = 5
+idx = 7
 source_file = str(idx)+"_source.png"
 mask_file = str(idx)+"_mask.png"
 target_file = str(idx)+"_target.png"
 
 # Hyperparameter Inputs
-gpu_id = 0
+gpu_id = 1
 num_steps = 1000
-ss = 230; # source image size
-ts = 512 # target image size
-x_start = 382; y_start = 300 # blending location
-grad_weight = 10000; style_weight = 10000; content_weight = 1; tv_weight = 10e-6; hist_weight = 0
+ss = 70; # source image size
+ts = 474 # target image size
+x_start = 100; y_start = 300 # blending location
+grad_weight = 10000; style_weight = 100; content_weight = 1; tv_weight = 10e-6; hist_weight = 0
 
 # Load Images
 source_img = np.array(Image.open(source_file).convert('RGB').resize((ss, ss)))
@@ -182,7 +182,7 @@ imsave(str(idx)+'_first_pass.png', blend_img_np.astype(np.uint8))
 ########### Second Pass ###########
 ###################################
 
-num_steps = 3000
+num_steps = 1000
 style_weight = 10000000; content_weight = 1; tv_weight = 10e-6
 ss = 512; ts = 512
 

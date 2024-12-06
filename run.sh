@@ -22,7 +22,13 @@ python run.py \
        --ss 320 --ts 512 --x 160 --y 256 \
        --gpu 0  --num_steps 1000 --save_video True
 
-
+python run.py \
+       --source_file data/6_source.png \
+       --mask_file data/6_mask.png \
+       --target_file data/7_target.png \
+       --output_dir results/7 \
+       --ss 130 --ts 474 --x 340 --y 160 \
+       --gpu 1  --num_steps 1000 --save_video False
 
 
 

@@ -16,15 +16,15 @@ import torch.nn.functional as F
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--source_file', type=str, default='data/1_source.png', help='path to the source image')
-parser.add_argument('--mask_file', type=str, default='data/1_mask.png', help='path to the mask image')
-parser.add_argument('--target_file', type=str, default='data/1_target.png', help='path to the target image')
-parser.add_argument('--output_dir', type=str, default='results/1', help='path to output')
-parser.add_argument('--ss', type=int, default=300, help='source image size')
-parser.add_argument('--ts', type=int, default=512, help='target image size')
-parser.add_argument('--x', type=int, default=200, help='vertical location (center)')
-parser.add_argument('--y', type=int, default=235, help='vertical location (center)')
-parser.add_argument('--gpu_id', type=int, default=0, help='GPU ID')
+parser.add_argument('--source_file', type=str, default='data/6_source.png', help='path to the source image')
+parser.add_argument('--mask_file', type=str, default='data/6_mask.png', help='path to the mask image')
+parser.add_argument('--target_file', type=str, default='data/7_target.png', help='path to the target image')
+parser.add_argument('--output_dir', type=str, default='results/7', help='path to output')
+parser.add_argument('--ss', type=int, default=130, help='source image size')
+parser.add_argument('--ts', type=int, default=474, help='target image size')
+parser.add_argument('--x', type=int, default=340, help='vertical location (center)')
+parser.add_argument('--y', type=int, default=155, help='vertical location (center)')
+parser.add_argument('--gpu_id', type=int, default=1, help='GPU ID')
 parser.add_argument('--num_steps', type=int, default=1000, help='Number of iterations in each pass')
 parser.add_argument('--save_video', type=bool, default=False, help='save the intermediate reconstruction process')
 opt = parser.parse_args()
@@ -51,7 +51,7 @@ ts = opt.ts # target image size
 x_start = opt.x; y_start = opt.y # blending location
 
 # Default weights for loss functions in the first pass
-grad_weight = 1e4; style_weight = 1e4; content_weight = 1; tv_weight = 1e-6
+grad_weight = 1e3; style_weight = 1e3; content_weight = 1; tv_weight = 1e-3
 
 # Load Images
 source_img = np.array(Image.open(source_file).convert('RGB').resize((ss, ss)))
@@ -182,92 +182,5 @@ blend_img_np = blend_img.transpose(1,3).transpose(1,2).cpu().data.numpy()[0]
 # Save image from the first pass
 first_pass_img_file = os.path.join(opt.output_dir, 'first_pass.png')
 imsave(first_pass_img_file, blend_img_np.astype(np.uint8))
-
-###################################
-########### Second Pass ###########
-###################################
-
-# Default weights for loss functions in the second pass
-style_weight = 1e7; content_weight = 1; tv_weight = 1e-6
-ss = 512; ts = 512
-num_steps = opt.num_steps
-
-first_pass_img = np.array(Image.open(first_pass_img_file).convert('RGB').resize((ss, ss)))
-target_img = np.array(Image.open(target_file).convert('RGB').resize((ts, ts)))
-first_pass_img = torch.from_numpy(first_pass_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
-target_img = torch.from_numpy(target_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
-
-first_pass_img = first_pass_img.contiguous()
-target_img = target_img.contiguous()
-
-# Define LBFGS optimizer
-def get_input_optimizer(first_pass_img):
-    optimizer = optim.LBFGS([first_pass_img.requires_grad_()])
-    return optimizer
-
-optimizer = get_input_optimizer(first_pass_img)
-
-print('Optimizing...')
-run = [0]
-while run[0] <= num_steps:
-    
-    def closure():
-        
-        # Compute Loss Loss    
-        target_features_style = vgg(mean_shift(target_img))
-        target_gram_style = [gram_matrix(y) for y in target_features_style]
-        blend_features_style = vgg(mean_shift(first_pass_img))
-        blend_gram_style = [gram_matrix(y) for y in blend_features_style]
-        style_loss = 0
-        for layer in range(len(blend_gram_style)):
-            style_loss += mse(blend_gram_style[layer], target_gram_style[layer])
-        style_loss /= len(blend_gram_style)  
-        style_loss *= style_weight        
-        
-        # Compute Content Loss
-        content_features = vgg(mean_shift(first_pass_img))
-        content_loss = content_weight * mse(blend_features_style.relu2_2, content_features.relu2_2)
-        
-        # Compute Total Loss and Update Image
-        loss = style_loss + content_loss
-        optimizer.zero_grad()
-        loss.backward()
-
-        # Write to output to a reconstruction video 
-        if opt.save_video:
-            foreground = first_pass_img*canvas_mask
-            foreground = (foreground - foreground.min()) / (foreground.max() - foreground.min())
-            background = target_img*(canvas_mask-1)*(-1)
-            background = background / 255.0
-            final_blend_img =  + foreground + background
-            recon_process_video.append_data(final_blend_img[0].transpose(0,2).transpose(0,1).cpu().data.numpy())
-        
-        # Print Loss
-        if run[0] % 1 == 0:
-            print("run {}:".format(run))
-            print(' style : {:4f}, content: {:4f}'.format(\
-                          style_loss.item(), \
-                          content_loss.item()
-                          ))
-            print()
-        
-        run[0] += 1
-        return loss
-    
-    optimizer.step(closure)
-
-# clamp the pixels range into 0 ~ 255
-first_pass_img.data.clamp_(0, 255)
-
-# Make the Final Blended Image
-input_img_np = first_pass_img.transpose(1,3).transpose(1,2).cpu().data.numpy()[0]
-
-# Save image from the second pass
-imsave(os.path.join(opt.output_dir, 'second_pass.png'), input_img_np.astype(np.uint8))
-
-# Save recon process video
-if opt.save_video:
-    recon_process_video.close()
-
 
 
